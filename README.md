@@ -10,17 +10,19 @@ It has the same network structures with MemNet, but there are some differences.
 Training data(.h5) and Test/Valid data(.mat) are made using MATLAB.
 
 -Training data
-   It contains 91 training images. 
+  It contains 91 training images. 
+
 -Valid data
-   Set5 dataset
+  Set5 dataset
+
 -Test data
-   LIVE1 dataset
+  LIVE1 dataset
 
 -training
-   run first cell in main.ipynb.
+  run first cell in main.ipynb.
 
 -test
-   run second cell in main.ipynb.
+  run second cell in main.ipynb.
 
 
 Results
