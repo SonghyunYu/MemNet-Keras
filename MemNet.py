@@ -1,4 +1,4 @@
-
+# -*- coding: utf-8 -*-
 
 from __future__ import print_function, division
 import tensorflow as tf
@@ -57,51 +57,6 @@ def psnr(img1, img2, max_val):
 
 
 
-# Subpixel layer.
-def SubpixelConv2D(scale=2):
-    """
-    Keras layer to do subpixel convolution.
-    NOTE: Tensorflow backend only. Uses tf.depth_to_space
-    Ref:
-        [1] Real-Time Single Image and Video Super-Resolution Using an Efficient Sub-Pixel Convolutional Neural Network
-            Shi et Al.
-            https://arxiv.org/abs/1609.05158
-    :param input_shape: tensor shape, (batch, height, width, channel)
-    :param scale: upsampling scale. Default=2
-    :return:
-    
-    
-    ----Usage Example----
-    # Subpixel Conv will upsample from (h, w, c) to (h/r, w/r, c/r^2)
-
-    scale = 4
-    inputs = Input(shape=input_shape)
-    
-    x = Convolution2D(channels * scale ** 2, (3, 3), 
-        activation='relu', 
-        name='conv3x3')(inputs)
-
-    out = SubpixelConv2D(input_shape, scale=scale)(x)
-
-    model = Model(inputs=inputs, outputs=out)
-
-"""
-# upsample using depth_to_space
-def subpixel_shape(input_shape):
-    dims = [input_shape[0],
-            input_shape[1],
-            input_shape[2],
-            int(input_shape[3] / (scale ** 2))]
-    output_shape = tuple(dims)
-    return output_shape
-
-    def subpixel(x):
-        return tf.depth_to_space(x, scale)
-
-
-    return Lambda(subpixel)
-
-
 
 def image_test(model_name, Test_DATA_PATH0, Test_DATA_PATH1, Output_PATH):
     
@@ -111,12 +66,11 @@ def image_test(model_name, Test_DATA_PATH0, Test_DATA_PATH1, Output_PATH):
             test_len = test_list0.__len__()
             test_names0 = os.listdir(Test_DATA_PATH0)
                        
-            # 모델 테스트.
-            
+            # test model
             ps = 0
             for i in range(test_len):
-                    origin = scipy.io.loadmat(test_list0[i])['imhigh'] # .mat 파일 중 이미지배열만 읽기.
-                    test = scipy.io.loadmat(test_list1[i])['imlow'] # .mat 파일 중 이미지배열만 읽기
+                    origin = scipy.io.loadmat(test_list0[i])['imhigh'] # load .mat file
+                    test = scipy.io.loadmat(test_list1[i])['imlow'] 
                     test = test / 127.5 - 1
                     
                     
@@ -177,8 +131,8 @@ class MemNet():
     def __init__(self):
         # Input shape
         self.channels = 3
-        self.height = 80                 # Low resolution height
-        self.width = 80                  # Low resolution width
+        self.height = 48                 # Low resolution height
+        self.width =  48                 # Low resolution width
         self.shape = (self.height, self.width, self.channels)
         
         self.gf = 64
@@ -186,8 +140,8 @@ class MemNet():
         optimizer = Adam(lr=0.0001, beta_1=0.9)
 
         # Configure data loader
-        self.patch_name = 'E:/ImageDataset/Input_standard_test_images/DIV2K(Train,Valid)_for_SR/DIV2K_train_HR/patches/patch_all_jpg20_color_size'+str(self.height)+'.h5'
-        self.label_name = 'E:/ImageDataset/Input_standard_test_images/DIV2K(Train,Valid)_for_SR/DIV2K_train_HR/patches/label_all_jpg20_color_size'+str(self.height)+'.h5'
+        self.patch_name = './data/train/patch_all_jpg10_rgb_size'+str(self.height)+'.h5'
+        self.label_name = './data/train/label_all_jpg10_rgb_size'+str(self.height)+'.h5'
         self.data_loader = MyDataLoader(patch_name=self.patch_name, label_name=self.label_name)
                                      
 
@@ -203,12 +157,17 @@ class MemNet():
 
         self.PATCH_NUMBER = self.data_loader.patch_number
         
-        self.Test_DATA_PATH0 =  "E:/ImageDataset/Input_standard_test_images/LIVE1/test/imhigh"
-        self.Test_DATA_PATH1 =  "E:/ImageDataset/Input_standard_test_images/LIVE1/test/imlow_q20"
+        self.Test_DATA_PATH0 =  "./data/test/LIVE1/original"
+        self.Test_DATA_PATH1 =  "./data/test/LIVE1/jpg_q10"
         self.test_list0 = glob(self.Test_DATA_PATH0 + '/*mat')
         self.test_list1 = glob(self.Test_DATA_PATH1 + '/*mat')
         self.test_len = self.test_list0.__len__()
        
+        self.Valid_DATA_PATH0 =  "./data/valid/original"
+        self.Valid_DATA_PATH1 =  "./data/valid/jpg_q10"
+        self.Valid_list0 = glob(self.Valid_DATA_PATH0 + '/*mat')
+        self.Valid_list1 = glob(self.Valid_DATA_PATH1 + '/*mat')
+        self.Valid_len = self.Valid_list0.__len__()
 
     def build_generator(self):
         
@@ -326,9 +285,11 @@ class MemNet():
    
     
     def train_G(self, end_ep, batch_size=1, sample_interval=50, second_training=False, start_ep=0):
+        '''
         if second_training: # L1 -> L2
-            self.generator.load_weights('./saved_Pre_Generator/MemNet_29.34dB_3ep_7000it_.h5')
+            self.generator.load_weights('./saved_model/MemNet_29.34dB_3ep_7000it_.h5')
             self.generator.compile(loss='mse',optimizer=Adam(lr=0.0001, beta_1=0.9))
+        '''
         
         start_time = datetime.datetime.now()
         max_psnr=0
@@ -337,9 +298,7 @@ class MemNet():
             print ("%d_ep / time: %s" % (ep, elapsed_time))
             step=0
             for it in range((self.PATCH_NUMBER//batch_size)):
-                # ------------------
-                #  Pre-Train Generator
-                # ------------------
+             
                 # Sample images and their conditioning counterparts
                 imgs_hr, imgs_lr = self.data_loader.load_data(step, batch_size)
                 step = step + batch_size
@@ -360,9 +319,9 @@ class MemNet():
        
         print(it, 'th iteration')
         ps = 0
-        for i in range(self.test_len):
-                origin = scipy.io.loadmat(self.test_list0[i])['imhigh'] # .mat 파일 중 이미지배열만 읽기.
-                test = scipy.io.loadmat(self.test_list1[i])['imlow'] # .mat 파일 중 이미지배열만 읽기
+        for i in range(self.Valid_len):
+                origin = scipy.io.loadmat(self.Valid_list0[i])['imhigh'] # load .mat file
+                test = scipy.io.loadmat(self.Valid_list1[i])['imlow'] 
                 test = test / 127.5 - 1
                 x_test = test.reshape(1,test.shape[0], test.shape[1], 3) 
                 pred = self.generator.predict(x_test, batch_size = 1)
@@ -372,20 +331,21 @@ class MemNet():
                 # rescale to range 0-1.
                 origin = origin / 255.
                 pred_img = pred_img*0.5 + 0.5
+               
 
                 y_origin = RGB_to_Gray(origin)
                 y_pred_img = RGB_to_Gray(pred_img)
 
                 ps +=  psnr(y_origin, y_pred_img,1.0) 
 
-        ps = ps/self.test_len
+        ps = ps/self.Valid_len
         print(' Val. PSNR      : ', ps)
         if ep==0 and it==0:
             max_psnr = ps; temp_ps = "%0.2f" % max_psnr
-            self.generator.save('./saved_Pre_Generator/MemNet_' + str(temp_ps) + 'dB_' + str(ep) + 'ep_' + str(it) + 'it_.h5')
+            self.generator.save('./saved_model/MemNet_' + str(temp_ps) + 'dB_' + str(ep) + 'ep_' + str(it) + 'it_.h5')
         elif max_psnr < ps:
             max_psnr = ps; temp_ps = "%0.2f" % max_psnr
-            self.generator.save('./saved_Pre_Generator/MemNet_' + str(temp_ps) + 'dB_' + str(ep) + 'ep_' + str(it) + 'it_.h5')
+            self.generator.save('./saved_model/MemNet_' + str(temp_ps) + 'dB_' + str(ep) + 'ep_' + str(it) + 'it_.h5')
 
         return max_psnr
                 
